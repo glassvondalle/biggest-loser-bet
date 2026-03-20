@@ -175,12 +175,15 @@ fig = px.line(
 fig.update_layout(legend_title_text="Person", xaxis_title="Measure date", yaxis_title="Weight (g)")
 st.plotly_chart(fig, use_container_width=True)
 
-st.subheader("Delta by % (vs previous measure)")
+st.subheader("Delta by % (vs initial weight)")
 delta_pct_df = chart_df_filtered.copy()
+delta_pct_df["initial_weight_g"] = delta_pct_df.groupby("person")["weight_g"].transform("first")
 delta_pct_df["pct_delta"] = (
-    delta_pct_df.groupby("person")["weight_g"].pct_change() * 100.0
+    (delta_pct_df["weight_g"] - delta_pct_df["initial_weight_g"])
+    / delta_pct_df["initial_weight_g"]
+    * 100.0
 )
-delta_pct_df = delta_pct_df.dropna(subset=["pct_delta"])
+delta_pct_df = delta_pct_df.dropna(subset=["pct_delta", "initial_weight_g"])
 
 fig_delta = px.line(
     delta_pct_df,
@@ -189,7 +192,7 @@ fig_delta = px.line(
     color="person",
     color_discrete_map=person_color_map,
     markers=True,
-    title="Percentage change between consecutive measures",
+    title="Percentage change versus initial weight",
 )
 fig_delta.update_layout(
     legend_title_text="Person",
