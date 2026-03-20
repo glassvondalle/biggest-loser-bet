@@ -103,13 +103,11 @@ def _prepare_any_csv(raw_df: pd.DataFrame) -> tuple[pd.DataFrame, str, list[str]
 default_csv_path = Path(__file__).with_name("weights.csv")
 if default_csv_path.exists():
     raw_csv_df = pd.read_csv(default_csv_path)
-    st.caption(f"Using CSV file: {default_csv_path.name}")
 else:
     st.error(f"Required file not found: {default_csv_path.name}")
     st.stop()
 
 long_df, csv_mode, date_columns = _prepare_any_csv(raw_csv_df)
-st.caption(f"Detected CSV format: {csv_mode}")
 
 if long_df.empty:
     st.warning("No valid rows found in CSV after cleaning.")
