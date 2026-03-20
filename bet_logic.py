@@ -48,7 +48,7 @@ def _cop_fine_for_gain_g(gr_gain: float) -> int:
     """
     if not np.isfinite(gr_gain) or gr_gain <= 0:
         return 0
-    return int(round(float(gr_gain) * 10.0))
+    return int(round(float(gr_gain) * 1000.0))
 
 
 def compute_fines_by_step(
