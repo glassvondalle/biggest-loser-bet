@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -10,41 +9,15 @@ import streamlit as st
 from bet_logic import (
     compute_fines_by_step,
     compute_winner_by_percent_loss,
-    first_and_third_fridays,
 )
 
 
 st.set_page_config(page_title="Biggest Loser Bet", layout="wide")
 
-st.title("Biggest Loser Bet (Jan–Jun timeline)")
-st.caption("Upload CSV in long format (name,date,weight) or wide format (one row per person)")
+st.title("Biggest Loser Bet")
+st.caption("Reading data from `weights.csv` in the project folder.")
 
 st.divider()
-
-now = datetime.now()
-default_year = now.year
-year = st.number_input("Year", min_value=2000, max_value=2100, value=int(default_year), step=1)
-
-points = first_and_third_fridays(int(year))
-date_columns = [p.measure_date.isoformat() for p in points]
-allowed_dates = set(date_columns)
-
-
-def _build_template_csv() -> str:
-    rows = ["name,date,weight"]
-    sample_people = ["Persona A", "Persona B", "Persona C"]
-    for person in sample_people:
-        for d in date_columns:
-            rows.append(f"{person},{d},")
-    return "\n".join(rows) + "\n"
-
-
-def _build_template_csv_wide() -> str:
-    headers = ["name", *date_columns]
-    rows = [",".join(headers)]
-    for person in ["Persona A", "Persona B", "Persona C"]:
-        rows.append(",".join([person] + [""] * len(date_columns)))
-    return "\n".join(rows) + "\n"
 
 
 def _prepare_long_df(raw_df: pd.DataFrame) -> pd.DataFrame:
@@ -70,14 +43,6 @@ def _prepare_long_df(raw_df: pd.DataFrame) -> pd.DataFrame:
         st.dataframe(invalid_date_rows.head(20), use_container_width=True)
         st.stop()
 
-    off_schedule = df[~df["date"].isin(allowed_dates)]
-    if not off_schedule.empty:
-        st.error(
-            "Some dates are outside the Jan-Jun 1st/3rd Friday schedule for the selected year."
-        )
-        st.dataframe(off_schedule.head(20), use_container_width=True)
-        st.stop()
-
     # Keep latest entry if duplicate person+date exists.
     df = df.dropna(subset=["weight"])
     df = df.drop_duplicates(subset=["name", "date"], keep="last")
@@ -98,13 +63,18 @@ def _prepare_wide_df(raw_df: pd.DataFrame) -> pd.DataFrame:
         st.error("Wide CSV must include date columns besides 'name'.")
         st.stop()
 
-    invalid_cols = [c for c in value_cols if c not in allowed_dates]
+    parsed_dates = pd.to_datetime(value_cols, errors="coerce")
+    invalid_cols = [c for c, parsed in zip(value_cols, parsed_dates) if pd.isna(parsed)]
     if invalid_cols:
         st.error(
-            "Wide CSV has invalid date columns. Allowed columns are the schedule dates for the selected year."
+            "Wide CSV has invalid date columns. Date columns must be parseable dates (example: YYYY-MM-DD)."
         )
         st.write("Invalid columns:", ", ".join(invalid_cols))
         st.stop()
+    normalized_value_cols = [d.strftime("%Y-%m-%d") for d in parsed_dates]
+    date_rename_map = dict(zip(value_cols, normalized_value_cols))
+    df = df.rename(columns=date_rename_map)
+    value_cols = normalized_value_cols
 
     df["name"] = df["name"].astype(str).str.strip()
     df = df[~df["name"].str.lower().isin(["", "nan", "none"])].copy()
@@ -118,48 +88,27 @@ def _prepare_wide_df(raw_df: pd.DataFrame) -> pd.DataFrame:
     return long_df[["name", "date", "weight"]]
 
 
-def _prepare_any_csv(raw_df: pd.DataFrame) -> tuple[pd.DataFrame, str]:
+def _prepare_any_csv(raw_df: pd.DataFrame) -> tuple[pd.DataFrame, str, list[str]]:
     cols = {str(c).strip().lower() for c in raw_df.columns}
     if {"name", "date", "weight"}.issubset(cols):
-        return _prepare_long_df(raw_df), "long"
+        long_df = _prepare_long_df(raw_df)
+        return long_df, "long", sorted(long_df["date"].dropna().unique().tolist())
     if "name" in cols:
-        return _prepare_wide_df(raw_df), "wide"
+        long_df = _prepare_wide_df(raw_df)
+        return long_df, "wide", sorted(long_df["date"].dropna().unique().tolist())
     st.error("CSV format not recognized. Use long (name,date,weight) or wide (name + date columns).")
     st.stop()
 
 
-st.subheader("CSV input")
-st.write("Supported formats: `name,date,weight` (long) or `name,<date1>,<date2>,...` (wide)")
-st.download_button(
-    "Download long CSV template",
-    data=_build_template_csv(),
-    file_name=f"weights_template_long_{int(year)}.csv",
-    mime="text/csv",
-)
-st.download_button(
-    "Download wide CSV template (one row per person)",
-    data=_build_template_csv_wide(),
-    file_name=f"weights_template_wide_{int(year)}.csv",
-    mime="text/csv",
-)
-
-uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
 default_csv_path = Path(__file__).with_name("weights.csv")
-
-if uploaded_file:
-    raw_csv_df = pd.read_csv(uploaded_file)
-    st.caption("Using uploaded CSV file.")
-elif default_csv_path.exists():
+if default_csv_path.exists():
     raw_csv_df = pd.read_csv(default_csv_path)
-    st.caption(f"Using default CSV from project folder: {default_csv_path.name}")
+    st.caption(f"Using CSV file: {default_csv_path.name}")
 else:
-    st.error(
-        f"No uploaded CSV and default file not found: {default_csv_path.name}. "
-        "Upload a CSV or add the default file to the project folder."
-    )
+    st.error(f"Required file not found: {default_csv_path.name}")
     st.stop()
 
-long_df, csv_mode = _prepare_any_csv(raw_csv_df)
+long_df, csv_mode, date_columns = _prepare_any_csv(raw_csv_df)
 st.caption(f"Detected CSV format: {csv_mode}")
 
 if long_df.empty:
