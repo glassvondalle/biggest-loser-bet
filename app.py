@@ -123,6 +123,22 @@ weights_df = (
 )
 
 person_options = sorted(weights_df["person"].dropna().astype(str).unique().tolist())
+contrast_palette = [
+    "#1f77b4",  # blue
+    "#d62728",  # red
+    "#2ca02c",  # green
+    "#9467bd",  # purple
+    "#ff7f0e",  # orange
+    "#17becf",  # cyan
+    "#8c564b",  # brown
+    "#e377c2",  # pink
+    "#7f7f7f",  # gray
+    "#bcbd22",  # olive
+]
+person_color_map = {
+    person: contrast_palette[idx % len(contrast_palette)]
+    for idx, person in enumerate(person_options)
+}
 selected_people = st.multiselect(
     "People to show in graphs",
     options=person_options,
@@ -152,6 +168,7 @@ fig = px.line(
     x="measure_date",
     y="weight_g",
     color="person",
+    color_discrete_map=person_color_map,
     markers=True,
     title="Weights across scheduled measures",
 )
@@ -170,6 +187,7 @@ fig_delta = px.line(
     x="measure_date",
     y="pct_delta",
     color="person",
+    color_discrete_map=person_color_map,
     markers=True,
     title="Percentage change between consecutive measures",
 )
