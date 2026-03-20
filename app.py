@@ -239,6 +239,8 @@ historic_table = (
     .reindex(index=person_options, columns=date_columns)
     .reset_index()
 )
+historic_display_cols = ["person", *date_columns[1:]]
+historic_table = historic_table[historic_display_cols]
 
 def _style_position_cell(val: object) -> str:
     if val == "1st":
@@ -251,12 +253,12 @@ def _style_position_cell(val: object) -> str:
 
 date_cols_for_style = [c for c in historic_table.columns if c != "person"]
 historic_styler = historic_table.style.map(_style_position_cell, subset=date_cols_for_style)
-st.dataframe(historic_styler, use_container_width=True)
+st.dataframe(historic_styler, use_container_width=True, hide_index=True)
 
 
 st.subheader("Fines (10 COP per gram gained, $20,000 COP if date is missing)")
 step_df, totals_df = compute_fines_by_step(weights_df, date_columns=date_columns)
-st.dataframe(totals_df, use_container_width=True)
+st.dataframe(totals_df, use_container_width=True, hide_index=True)
 
 with st.expander("Breakdown per step (fines only)", expanded=False):
     # Show all rows that produced a fee (gain fee or missing-date fee).
@@ -277,6 +279,7 @@ with st.expander("Breakdown per step (fines only)", expanded=False):
             ]
         ],
         use_container_width=True,
+        hide_index=True,
     )
 
 
@@ -290,5 +293,19 @@ else:
 
 score_df_display = score_df.copy()
 score_df_display["pct_loss"] = score_df_display["pct_loss"].map(lambda x: None if pd.isna(x) else round(float(x), 2))
-st.dataframe(score_df_display, use_container_width=True)
+top_pct_loss = score_df["pct_loss"].dropna().max()
+if pd.notna(top_pct_loss):
+    score_df_display["target_final_weight_g_tie_1st"] = score_df_display["baseline_g"].map(
+        lambda x: None if pd.isna(x) else round(float(x) * (1.0 - float(top_pct_loss) / 100.0), 2)
+    )
+    score_df_display["weight_to_lose_g_to_tie_1st"] = score_df_display.apply(
+        lambda r: None
+        if pd.isna(r["final_g"]) or pd.isna(r["target_final_weight_g_tie_1st"])
+        else round(max(0.0, float(r["final_g"]) - float(r["target_final_weight_g_tie_1st"])), 2),
+        axis=1,
+    )
+else:
+    score_df_display["target_final_weight_g_tie_1st"] = None
+    score_df_display["weight_to_lose_g_to_tie_1st"] = None
+st.dataframe(score_df_display, use_container_width=True, hide_index=True)
 
