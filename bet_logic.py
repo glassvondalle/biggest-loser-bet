@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import calendar
-import math
 from dataclasses import dataclass
 from datetime import date
 from typing import Iterable, List, Tuple
@@ -45,12 +44,11 @@ def first_and_third_fridays(
 def _cop_fine_for_gain_g(gr_gain: float) -> int:
     """
     For each 100 grams over (i.e., gained), the fine is $1,000 COP.
-    Example: 1..100g => 1,000; 101..200g => 2,000; etc.
+    This is proportional: 700g => 7,000 COP; 50g => 500 COP.
     """
     if not np.isfinite(gr_gain) or gr_gain <= 0:
         return 0
-    hundreds = math.ceil(gr_gain / 100.0)
-    return int(hundreds * 1000)
+    return int(round(float(gr_gain) * 10.0))
 
 
 def compute_fines_by_step(
