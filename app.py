@@ -146,6 +146,29 @@ fig = px.line(
 fig.update_layout(legend_title_text="Person", xaxis_title="Measure date", yaxis_title="Weight (g)")
 st.plotly_chart(fig, use_container_width=True)
 
+st.subheader("Delta by % (vs previous measure)")
+delta_pct_df = chart_df.copy()
+delta_pct_df["pct_delta"] = (
+    delta_pct_df.groupby("person")["weight_g"].pct_change() * 100.0
+)
+delta_pct_df = delta_pct_df.dropna(subset=["pct_delta"])
+
+fig_delta = px.line(
+    delta_pct_df,
+    x="measure_date",
+    y="pct_delta",
+    color="person",
+    markers=True,
+    title="Percentage change between consecutive measures",
+)
+fig_delta.update_layout(
+    legend_title_text="Person",
+    xaxis_title="Measure date",
+    yaxis_title="Delta (%)",
+)
+fig_delta.add_hline(y=0, line_dash="dash", line_color="gray")
+st.plotly_chart(fig_delta, use_container_width=True)
+
 
 st.subheader("Fines ($1,000 COP per 100g gained step, $20,000 COP if date is missing)")
 step_df, totals_df = compute_fines_by_step(weights_df, date_columns=date_columns)
