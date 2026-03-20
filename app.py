@@ -182,7 +182,7 @@ fig_delta.add_hline(y=0, line_dash="dash", line_color="gray")
 st.plotly_chart(fig_delta, use_container_width=True)
 
 st.subheader("Historic positions by date")
-st.caption("Ranking is based on % loss versus each person's first recorded weight. Medals show position per date.")
+st.caption("Ranking is based on % loss versus each person's first recorded weight.")
 
 baseline_col = date_columns[0]
 ranking_rows = []
@@ -206,21 +206,31 @@ def _position_to_medal(position: float | int | None) -> str:
     if pd.isna(position):
         return "—"
     pos = int(position)
-    if pos == 1:
-        return "🥇"
-    if pos == 2:
-        return "🥈"
-    if pos == 3:
-        return "🥉"
-    return f"🏅{pos}"
+    if 10 <= (pos % 100) <= 20:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(pos % 10, "th")
+    return f"{pos}{suffix}"
 
-ranking_df["medal"] = ranking_df["position"].map(_position_to_medal)
+ranking_df["position_label"] = ranking_df["position"].map(_position_to_medal)
 historic_table = (
-    ranking_df.pivot(index="person", columns="date", values="medal")
+    ranking_df.pivot(index="person", columns="date", values="position_label")
     .reindex(index=person_options, columns=date_columns)
     .reset_index()
 )
-st.dataframe(historic_table, use_container_width=True)
+
+def _style_position_cell(val: object) -> str:
+    if val == "1st":
+        return "background-color: #FFD700; color: #1a1a1a; font-weight: 700;"
+    if val == "2nd":
+        return "background-color: #C0C0C0; color: #1a1a1a; font-weight: 700;"
+    if val == "3rd":
+        return "background-color: #CD7F32; color: #1a1a1a; font-weight: 700;"
+    return ""
+
+date_cols_for_style = [c for c in historic_table.columns if c != "person"]
+historic_styler = historic_table.style.map(_style_position_cell, subset=date_cols_for_style)
+st.dataframe(historic_styler, use_container_width=True)
 
 
 st.subheader("Fines (10 COP per gram gained, $20,000 COP if date is missing)")
