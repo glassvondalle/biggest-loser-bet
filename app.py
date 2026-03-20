@@ -122,6 +122,17 @@ weights_df = (
     .rename(columns={"name": "person"})
 )
 
+person_options = sorted(weights_df["person"].dropna().astype(str).unique().tolist())
+selected_people = st.multiselect(
+    "People to show in graphs",
+    options=person_options,
+    default=person_options,
+)
+
+if not selected_people:
+    st.warning("Select at least one person to display the graphs.")
+    st.stop()
+
 st.subheader("Timeline graph")
 st.caption("For the graph only: missing scheduled weights are filled with the previous known value.")
 chart_df = weights_df.copy()
@@ -134,9 +145,10 @@ chart_df = chart_df.melt(
 )
 chart_df["measure_date"] = pd.to_datetime(chart_df["measure_date"])
 chart_df = chart_df.sort_values(["person", "measure_date"])
+chart_df_filtered = chart_df[chart_df["person"].isin(selected_people)].copy()
 
 fig = px.line(
-    chart_df,
+    chart_df_filtered,
     x="measure_date",
     y="weight_g",
     color="person",
@@ -147,7 +159,7 @@ fig.update_layout(legend_title_text="Person", xaxis_title="Measure date", yaxis_
 st.plotly_chart(fig, use_container_width=True)
 
 st.subheader("Delta by % (vs previous measure)")
-delta_pct_df = chart_df.copy()
+delta_pct_df = chart_df_filtered.copy()
 delta_pct_df["pct_delta"] = (
     delta_pct_df.groupby("person")["weight_g"].pct_change() * 100.0
 )
@@ -169,8 +181,49 @@ fig_delta.update_layout(
 fig_delta.add_hline(y=0, line_dash="dash", line_color="gray")
 st.plotly_chart(fig_delta, use_container_width=True)
 
+st.subheader("Historic positions by date")
+st.caption("Ranking is based on % loss versus each person's first recorded weight. Medals show position per date.")
 
-st.subheader("Fines ($1,000 COP per 100g gained step, $20,000 COP if date is missing)")
+baseline_col = date_columns[0]
+ranking_rows = []
+for _, row in weights_df.iterrows():
+    person = str(row["person"])
+    baseline = row.get(baseline_col, pd.NA)
+    for date_col in date_columns:
+        current = row.get(date_col, pd.NA)
+        if pd.isna(baseline) or pd.isna(current) or float(baseline) <= 0:
+            pct_loss = pd.NA
+        else:
+            pct_loss = (float(baseline) - float(current)) / float(baseline) * 100.0
+        ranking_rows.append({"person": person, "date": date_col, "pct_loss": pct_loss})
+
+ranking_df = pd.DataFrame(ranking_rows)
+ranking_df["position"] = (
+    ranking_df.groupby("date")["pct_loss"].rank(method="min", ascending=False)
+)
+
+def _position_to_medal(position: float | int | None) -> str:
+    if pd.isna(position):
+        return "—"
+    pos = int(position)
+    if pos == 1:
+        return "🥇"
+    if pos == 2:
+        return "🥈"
+    if pos == 3:
+        return "🥉"
+    return f"🏅{pos}"
+
+ranking_df["medal"] = ranking_df["position"].map(_position_to_medal)
+historic_table = (
+    ranking_df.pivot(index="person", columns="date", values="medal")
+    .reindex(index=person_options, columns=date_columns)
+    .reset_index()
+)
+st.dataframe(historic_table, use_container_width=True)
+
+
+st.subheader("Fines (10 COP per gram gained, $20,000 COP if date is missing)")
 step_df, totals_df = compute_fines_by_step(weights_df, date_columns=date_columns)
 st.dataframe(totals_df, use_container_width=True)
 
