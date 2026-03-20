@@ -179,7 +179,7 @@ st.subheader("Delta by % (vs initial weight)")
 delta_pct_df = chart_df_filtered.copy()
 delta_pct_df["initial_weight_g"] = delta_pct_df.groupby("person")["weight_g"].transform("first")
 delta_pct_df["pct_delta"] = (
-    (delta_pct_df["weight_g"] - delta_pct_df["initial_weight_g"])
+    (delta_pct_df["initial_weight_g"] - delta_pct_df["weight_g"])
     / delta_pct_df["initial_weight_g"]
     * 100.0
 )
@@ -192,7 +192,7 @@ fig_delta = px.line(
     color="person",
     color_discrete_map=person_color_map,
     markers=True,
-    title="Percentage change versus initial weight",
+    title="Percentage loss versus initial weight",
 )
 fig_delta.update_layout(
     legend_title_text="Person",
