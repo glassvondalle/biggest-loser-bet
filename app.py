@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 
 import pandas as pd
 import plotly.express as px
@@ -143,11 +144,21 @@ st.download_button(
 )
 
 uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
-if not uploaded_file:
-    st.info("Upload a CSV file to display the timeline, fines, and winner.")
+default_csv_path = Path(__file__).with_name("weights.csv")
+
+if uploaded_file:
+    raw_csv_df = pd.read_csv(uploaded_file)
+    st.caption("Using uploaded CSV file.")
+elif default_csv_path.exists():
+    raw_csv_df = pd.read_csv(default_csv_path)
+    st.caption(f"Using default CSV from project folder: {default_csv_path.name}")
+else:
+    st.error(
+        f"No uploaded CSV and default file not found: {default_csv_path.name}. "
+        "Upload a CSV or add the default file to the project folder."
+    )
     st.stop()
 
-raw_csv_df = pd.read_csv(uploaded_file)
 long_df, csv_mode = _prepare_any_csv(raw_csv_df)
 st.caption(f"Detected CSV format: {csv_mode}")
 
